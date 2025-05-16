@@ -90,14 +90,21 @@ def get_workouts():
     events = []
     
     for workout in workouts:
-        # Base event data
-        event_data = {
-            'id': workout.id,
-            'title': workout.title,
+        # Base event data with all properties in extendedProps
+        base_props = {
             'type': workout.type,
             'description': workout.description,
             'duration': workout.duration,
             'completed': workout.completed,
+            'is_recurring': workout.is_recurring,
+            'recurrence_rule': workout.recurrence_rule,
+            'recurrence_end': workout.recurrence_end.isoformat() if workout.recurrence_end else None
+        }
+        
+        event_data = {
+            'id': workout.id,
+            'title': workout.type.capitalize(),
+            'extendedProps': base_props,
             'className': f"{workout.type} {'completed' if workout.completed else ''}"
         }
         
@@ -117,8 +124,13 @@ def get_workouts():
             
             # Create an event for each occurrence
             for occurrence in occurrences:
-                occurrence_data = event_data.copy()
-                occurrence_data['start'] = occurrence.isoformat()
+                occurrence_data = {
+                    'id': event_data['id'],
+                    'title': event_data['title'],
+                    'start': occurrence.isoformat(),
+                    'extendedProps': dict(base_props),  # Create a new copy of props for each occurrence
+                    'className': event_data['className']
+                }
                 events.append(occurrence_data)
         else:
             # Single event

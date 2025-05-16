@@ -24,8 +24,7 @@ class User(UserMixin, db.Model):
 
 class Workout(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    type = db.Column(db.String(20), nullable=False)
-    title = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.String(20), nullable=False)  # 'pilates' or 'dance' or 'skate'
     description = db.Column(db.Text)
     date = db.Column(db.DateTime, nullable=False)
     duration = db.Column(db.Integer)  # duration in minutes
@@ -33,7 +32,7 @@ class Workout(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # New fields for recurrence
+    # Fields for recurrence
     is_recurring = db.Column(db.Boolean, default=False)
     recurrence_rule = db.Column(db.String(200))  # RRULE string
     recurrence_end = db.Column(db.DateTime)  # When the recurrence ends
@@ -43,7 +42,6 @@ class Workout(db.Model):
         return {
             'id': self.id,
             'type': self.type,
-            'title': self.title,
             'description': self.description,
             'date': self.date.isoformat(),
             'duration': self.duration,

@@ -19,7 +19,6 @@ def print_workout(workout):
     print(f"""
     ID: {workout['id']}
     Type: {workout['type']}
-    Title: {workout['title']}
     Description: {workout['description'] or 'None'}
     Date: {workout['date']}
     Duration: {workout['duration']} minutes

@@ -18,10 +18,6 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="workoutTitle" class="form-label">Title</label>
-                        <input type="text" class="form-control" id="workoutTitle" required>
-                    </div>
-                    <div class="mb-3">
                         <label for="workoutDate" class="form-label">Date & Time</label>
                         <input type="datetime-local" class="form-control" id="workoutDate" required>
                     </div>
@@ -132,9 +128,8 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const formData = {
             type: document.getElementById('workoutType').value,
-            title: document.getElementById('workoutTitle').value,
             date: document.getElementById('workoutDate').value,
-            duration: document.getElementById('workoutDuration').value,
+            duration: parseInt(document.getElementById('workoutDuration').value, 10),
             description: document.getElementById('workoutDescription').value,
             is_recurring: document.getElementById('isRecurring').checked,
             recurrence_rule: document.getElementById('isRecurring').checked ? 
@@ -142,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
             recurrence_end: document.getElementById('isRecurring').checked ? 
                 document.getElementById('recurrenceEnd').value : null
         };
+        console.log('Form Data:', formData);
 
         fetch("{{ url_for('main.create_workout') }}", {
             method: 'POST',
@@ -162,6 +158,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = new bootstrap.Modal(document.getElementById('workoutModal'));
         const details = document.getElementById('workoutDetails');
         
+        // Debug logging
+        console.log('Event:', event);
+        console.log('Extended Props:', event.extendedProps);
+        console.log('Duration:', event.extendedProps.duration);
+        
         // Format recurrence pattern for display
         let recurrenceText = '';
         if (event.extendedProps.is_recurring) {
@@ -181,11 +182,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         details.innerHTML = `
             <p><strong>Type:</strong> ${event.extendedProps.type}</p>
-            <p><strong>Title:</strong> ${event.title}</p>
             <p><strong>Date:</strong> ${event.start.toLocaleString()}</p>
             <p><strong>Duration:</strong> ${event.extendedProps.duration || 0} minutes</p>
             <p><strong>Description:</strong> ${event.extendedProps.description || 'No description'}</p>
-            <p><strong>Status:</strong> ${event.extendedProps.completed ? 'Completed' : 'Pending'}</p>
             ${recurrenceText ? `<p><strong>Recurrence:</strong> ${recurrenceText}</p>` : ''}
         `;
 
