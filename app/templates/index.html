@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Workout Calendar{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center text-center">
+        <div class="col-md-8">
+            <h1 class="display-4 mb-4">Welcome to Workout Calendar</h1>
+            <p class="lead mb-4">Plan and track your workout sessions with our easy-to-use calendar system.</p>
+            <div class="d-grid gap-2 col-6 mx-auto">
+                <a href="{{ url_for('main.register') }}" class="btn btn-primary btn-lg mb-2">Get Started</a>
+                <a href="{{ url_for('main.login') }}" class="btn btn-outline-primary btn-lg">Login</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
