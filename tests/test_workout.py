@@ -27,7 +27,6 @@ class TestWorkout(unittest.TestCase):
         """Test creating a new workout"""
         workout = Workout(
             type='Running',
-            title='Morning Run',
             date=datetime.utcnow(),
             duration=30,
             completed=False,
@@ -37,7 +36,7 @@ class TestWorkout(unittest.TestCase):
         db.session.commit()
 
         # Verify the workout was created
-        saved_workout = Workout.query.filter_by(title='Morning Run').first()
+        saved_workout = Workout.query.filter_by(type='Running').first()
         self.assertIsNotNone(saved_workout)
         self.assertEqual(saved_workout.type, 'Running')
         self.assertEqual(saved_workout.duration, 30)

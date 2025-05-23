@@ -87,27 +87,30 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Set default dates
-    const now = new Date();
+    userTimezone = "{{ user_timezone }}";
+    
+    // Ensure we have a valid timezone
+    if (!userTimezone) {
+        userTimezone = 'America/Los_Angeles';
+    }
+    
+    const now = luxon.DateTime.now().setZone(userTimezone);
+    
     // Round to nearest 15 minutes
-    const minutes = now.getMinutes();
-    const roundedMinutes = Math.round(minutes / 15) * 15;
-    now.setMinutes(roundedMinutes);
-    now.setSeconds(0);
-    now.setMilliseconds(0);
+    const roundedMinutes = Math.round(now.minute / 15) * 15;
+    const roundedNow = now.set({minute: roundedMinutes, second: 0, millisecond: 0});
+    const endTime = roundedNow.plus({hours: 1});
+
+    const formatForInput = dt => dt.toFormat('yyyy-MM-dd\'T\'HH:mm');
     
-    // Set end time to 1 hour later
-    const endTime = new Date(now);
-    endTime.setHours(endTime.getHours() + 1);
+    const startTimeInput = document.getElementById('workoutStartTime');
+    const endTimeInput = document.getElementById('workoutEndTime');
     
-    // Format dates for input
-    const formatDate = (date) => date.toISOString().slice(0, 16);
-    
-    // Set default values
-    document.getElementById('workoutStartTime').value = formatDate(now);
-    document.getElementById('workoutEndTime').value = formatDate(endTime);
+    startTimeInput.value = formatForInput(roundedNow);
+    endTimeInput.value = formatForInput(endTime);
 
     var calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
@@ -176,31 +179,54 @@ document.addEventListener('DOMContentLoaded', function() {
             recurrence_end: document.getElementById('isRecurring').checked ? 
                 document.getElementById('recurrenceEnd').value : null
         };
-        console.log('Form Data:', formData);
 
-        fetch("{{ url_for('main.create_workout') }}", {
+        // Submit the form
+        fetch('/api/workouts', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(formData)
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || 'Failed to create workout');
+                });
+            }
+            return response.json();
+        })
         .then(data => {
-            calendar.refetchEvents();
+            // Add the new event to the calendar
+            calendar.addEvent({
+                id: data.id,
+                title: data.type.capitalize(),
+                start: data.date,
+                extendedProps: {
+                    type: data.type,
+                    description: data.description,
+                    duration: data.duration,
+                    completed: data.completed,
+                    is_recurring: data.is_recurring,
+                    recurrence_rule: data.recurrence_rule,
+                    recurrence_end: data.recurrence_end
+                },
+                className: data.type + (data.completed ? ' completed' : '') + 
+                         (data.is_recurring && data.recurrence_rule ? ' recurring' : '')
+            });
+            
+            // Reset the form
             this.reset();
             document.getElementById('recurrenceOptions').style.display = 'none';
+        })
+        .catch(error => {
+            alert(error.message);
         });
     });
 
     function showWorkoutDetails(event) {
         const modal = new bootstrap.Modal(document.getElementById('workoutModal'));
         const details = document.getElementById('workoutDetails');
-        
-        // Debug logging
-        console.log('Event:', event);
-        console.log('Extended Props:', event.extendedProps);
-        console.log('Duration:', event.extendedProps.duration);
         
         // Format recurrence pattern for display
         let recurrenceText = '';

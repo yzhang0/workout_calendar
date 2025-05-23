@@ -87,57 +87,15 @@ def logout():
 @login_required
 def get_workouts():
     workouts = Workout.query.filter_by(user_id=current_user.id).all()
-    events = []
-    
-    for workout in workouts:
-        # Base event data with all properties in extendedProps
-        base_props = {
-            'type': workout.type,
-            'description': workout.description,
-            'duration': workout.duration,
-            'completed': workout.completed,
-            'is_recurring': workout.is_recurring,
-            'recurrence_rule': workout.recurrence_rule,
-            'recurrence_end': workout.recurrence_end.isoformat() if workout.recurrence_end else None
-        }
-        
-        event_data = {
-            'id': workout.id,
-            'title': workout.type.capitalize(),
-            'extendedProps': base_props,
-            'className': f"{workout.type} {'completed' if workout.completed else ''}"
-        }
-        
-        if workout.is_recurring and workout.recurrence_rule:
-            # Add recurring class to className
-            event_data['className'] += ' recurring'
-            
-            # Parse the recurrence rule
-            rule = rrulestr(workout.recurrence_rule, dtstart=workout.date)
-            
-            # If there's an end date, use it
-            if workout.recurrence_end:
-                occurrences = rule.between(workout.date, workout.recurrence_end, inc=True)
-            else:
-                # If no end date, generate next few occurrences
-                occurrences = list(rule.xafter(workout.date, count=10, inc=True))
-            
-            # Create an event for each occurrence
-            for occurrence in occurrences:
-                occurrence_data = {
-                    'id': event_data['id'],
-                    'title': event_data['title'],
-                    'start': occurrence.isoformat(),
-                    'extendedProps': dict(base_props),  # Create a new copy of props for each occurrence
-                    'className': event_data['className']
-                }
-                events.append(occurrence_data)
-        else:
-            # Single event
-            event_data['start'] = workout.date.isoformat()
-            events.append(event_data)
-    
-    return jsonify(events)
+    return jsonify([{
+        'id': w.id,
+        'start': w.date.isoformat(),
+        'type': w.type,
+        'description': w.description,
+        'duration': w.duration,
+        'completed': w.completed,
+        'className': f"{w.type} {'completed' if w.completed else ''}"
+    } for w in workouts])
 
 @bp.route('/api/workouts', methods=['POST'])
 @login_required
@@ -145,7 +103,6 @@ def create_workout():
     data = request.json
     workout = Workout(
         type=data['type'],
-        title=data['title'],
         date=datetime.fromisoformat(data['date']),
         duration=data['duration'],
         description=data.get('description', ''),
