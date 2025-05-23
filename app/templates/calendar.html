@@ -18,12 +18,12 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="workoutDate" class="form-label">Date & Time</label>
-                        <input type="datetime-local" class="form-control" id="workoutDate" required>
+                        <label for="workoutStartTime" class="form-label">Start Time</label>
+                        <input type="datetime-local" class="form-control" id="workoutStartTime" required>
                     </div>
                     <div class="mb-3">
-                        <label for="workoutDuration" class="form-label">Duration (minutes)</label>
-                        <input type="number" class="form-control" id="workoutDuration" required>
+                        <label for="workoutEndTime" class="form-label">End Time</label>
+                        <input type="datetime-local" class="form-control" id="workoutEndTime" required>
                     </div>
                     <div class="mb-3">
                         <label for="workoutDescription" class="form-label">Description</label>
@@ -89,6 +89,26 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Set default dates
+    const now = new Date();
+    // Round to nearest 15 minutes
+    const minutes = now.getMinutes();
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    now.setMinutes(roundedMinutes);
+    now.setSeconds(0);
+    now.setMilliseconds(0);
+    
+    // Set end time to 1 hour later
+    const endTime = new Date(now);
+    endTime.setHours(endTime.getHours() + 1);
+    
+    // Format dates for input
+    const formatDate = (date) => date.toISOString().slice(0, 16);
+    
+    // Set default values
+    document.getElementById('workoutStartTime').value = formatDate(now);
+    document.getElementById('workoutEndTime').value = formatDate(endTime);
+
     var calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
         initialView: 'dayGridMonth',
         headerToolbar: {
@@ -126,10 +146,29 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
     document.getElementById('addWorkoutForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        const startTime = new Date(document.getElementById('workoutStartTime').value);
+        const endTime = new Date(document.getElementById('workoutEndTime').value);
+        
+        // Calculate duration in minutes
+        const duration = Math.round((endTime - startTime) / (1000 * 60));
+        
+        // Validate that end time is after start time
+        if (endTime <= startTime) {
+            alert('End time must be after start time');
+            return;
+        }
+        
+        // Validate that duration is in 15-minute increments
+        if (duration % 15 !== 0) {
+            alert('Duration must be in 15-minute increments');
+            return;
+        }
+        
         const formData = {
             type: document.getElementById('workoutType').value,
-            date: document.getElementById('workoutDate').value,
-            duration: parseInt(document.getElementById('workoutDuration').value, 10),
+            date: startTime.toISOString(),
+            duration: duration,
             description: document.getElementById('workoutDescription').value,
             is_recurring: document.getElementById('isRecurring').checked,
             recurrence_rule: document.getElementById('isRecurring').checked ? 
