@@ -6,6 +6,7 @@ from app.models import User, Workout
 from datetime import datetime, timedelta
 from dateutil.rrule import rrulestr
 from sqlalchemy.exc import IntegrityError
+import traceback
 
 bp = Blueprint('main', __name__)
 
@@ -100,20 +101,29 @@ def get_workouts():
 @bp.route('/api/workouts', methods=['POST'])
 @login_required
 def create_workout():
-    data = request.json
-    workout = Workout(
-        type=data['type'],
-        date=datetime.fromisoformat(data['date']),
-        duration=data['duration'],
-        description=data.get('description', ''),
-        user_id=current_user.id,
-        is_recurring=data.get('is_recurring', False),
-        recurrence_rule=data.get('recurrence_rule'),
-        recurrence_end=datetime.fromisoformat(data['recurrence_end']) if data.get('recurrence_end') else None
-    )
-    db.session.add(workout)
-    db.session.commit()
-    return jsonify(workout.to_dict())
+    try:
+        data = request.json
+        print(data)
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        workout = Workout(
+            type=data['type'],
+            date=datetime.fromisoformat(data['date']),
+            duration=data['duration'],
+            description=data.get('description', ''),
+            user_id=current_user.id,
+            is_recurring=data.get('is_recurring', False),
+            recurrence_rule=data.get('recurrence_rule'),
+            recurrence_end=datetime.fromisoformat(data['recurrence_end']) if data.get('recurrence_end') else None
+        )
+        db.session.add(workout)
+        db.session.commit()
+        return jsonify(workout.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()  # This will print the full stack trace to your server log
+        return jsonify({'error': str(e)}), 400
 
 @bp.route('/api/workouts/<int:id>', methods=['DELETE'])
 @login_required

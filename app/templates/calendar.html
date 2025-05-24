@@ -19,11 +19,11 @@
                     </div>
                     <div class="mb-3">
                         <label for="workoutStartTime" class="form-label">Start Time</label>
-                        <input type="datetime-local" class="form-control" id="workoutStartTime" required>
+                        <input type="datetime-local" class="form-control" id="workoutStartTime" step="900" required>
                     </div>
                     <div class="mb-3">
                         <label for="workoutEndTime" class="form-label">End Time</label>
-                        <input type="datetime-local" class="form-control" id="workoutEndTime" required>
+                        <input type="datetime-local" class="form-control" id="workoutEndTime" step="900" required>
                     </div>
                     <div class="mb-3">
                         <label for="workoutDescription" class="form-label">Description</label>
@@ -98,8 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     const now = luxon.DateTime.now().setZone(userTimezone);
-    
-    // Round to nearest 15 minutes
     const roundedMinutes = Math.round(now.minute / 15) * 15;
     const roundedNow = now.set({minute: roundedMinutes, second: 0, millisecond: 0});
     const endTime = roundedNow.plus({hours: 1});
@@ -108,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const startTimeInput = document.getElementById('workoutStartTime');
     const endTimeInput = document.getElementById('workoutEndTime');
-    
+
     startTimeInput.value = formatForInput(roundedNow);
     endTimeInput.value = formatForInput(endTime);
 
@@ -168,10 +166,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        const formatDate = (date) => {
+            return date.toISOString().split('.')[0]; // Remove milliseconds and timezone
+        };
+
         const formData = {
             type: document.getElementById('workoutType').value,
-            date: startTime.toISOString(),
-            duration: duration,
+            date: formatDate(startTime), // Use the formatted date
+            duration: Math.round((endTime - startTime) / (1000 * 60)),
             description: document.getElementById('workoutDescription').value,
             is_recurring: document.getElementById('isRecurring').checked,
             recurrence_rule: document.getElementById('isRecurring').checked ? 
@@ -179,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
             recurrence_end: document.getElementById('isRecurring').checked ? 
                 document.getElementById('recurrenceEnd').value : null
         };
+        console.log(formData);
 
         // Submit the form
         fetch('/api/workouts', {
@@ -189,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(formData)
         })
         .then(response => {
+            console.log(response);
             if (!response.ok) {
                 return response.json().then(err => {
                     throw new Error(err.error || 'Failed to create workout');
@@ -200,7 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add the new event to the calendar
             calendar.addEvent({
                 id: data.id,
-                title: data.type.capitalize(),
                 start: data.date,
                 extendedProps: {
                     type: data.type,
@@ -215,12 +218,12 @@ document.addEventListener('DOMContentLoaded', function() {
                          (data.is_recurring && data.recurrence_rule ? ' recurring' : '')
             });
             
-            // Reset the form
-            this.reset();
+            // Reset the form using the form element directly
+            document.getElementById('addWorkoutForm').reset();
             document.getElementById('recurrenceOptions').style.display = 'none';
         })
         .catch(error => {
-            alert(error.message);
+            console.error('Error:', error);
         });
     });
 
