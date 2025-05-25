@@ -52,7 +52,7 @@ def register():
                 flash('Email already registered. Please use a different email.', 'danger')
                 return render_template('register.html')
             
-            user = User(username=request.form['username'], email=request.form['email'])
+            user = User(username=request.form['username'], email=request.form['email'], timezone=request.form['timezone'])
             user.set_password(request.form['password'])
             db.session.add(user)
             db.session.commit()
@@ -146,7 +146,6 @@ def create_workout():
     data = request.json
     workout = Workout(
         type=data['type'],
-        title=data['title'],
         date=datetime.fromisoformat(data['date']),
         duration=data['duration'],
         description=data.get('description', ''),
@@ -206,7 +205,6 @@ def create_goal():
     )
     db.session.add(goal)
     db.session.commit()
-    print(goal)
     return jsonify({'message': 'Goal created', 'goal': {
         'id': goal.id,
         'workout_type': goal.workout_type,
@@ -225,3 +223,45 @@ def get_goals():
         'description': goal.description,
         'weeks_to_complete': goal.weeks_to_complete
     } for goal in goals])
+
+@bp.route('/api/goals/<int:id>', methods=['PUT'])
+@login_required
+@api_wrapper
+def update_goal(id):
+    goal = Goal.query.get_or_404(id)
+    if goal.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.get_json()
+    workout_type = data.get('workoutType')
+    description = data.get('goalDescription')
+    weeks_to_complete = data.get('weeksToWork')
+    
+    if not (workout_type and description and weeks_to_complete):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    goal.workout_type = workout_type
+    goal.description = description
+    goal.weeks_to_complete = int(weeks_to_complete)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Goal updated', 'goal': {
+        'id': goal.id,
+        'workout_type': goal.workout_type,
+        'description': goal.description,
+        'weeks_to_complete': goal.weeks_to_complete
+    }})
+
+@bp.route('/api/goals/<int:id>', methods=['DELETE'])
+@login_required
+@api_wrapper
+def delete_goal(id):
+    goal = Goal.query.get_or_404(id)
+    if goal.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    db.session.delete(goal)
+    db.session.commit()
+    
+    return jsonify({'message': 'Goal deleted'})

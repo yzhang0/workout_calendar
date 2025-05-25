@@ -6,34 +6,61 @@
 <div class="row">
     <div class="col-md-12">
         <h2>Set Your Workout Goals</h2>
-        <form id="goalsForm">
-            <div class="mb-3">
-                <label for="workoutType" class="form-label">Workout Type</label>
-                <select class="form-select" id="workoutType" required>
-                    <option value="pilates">Pilates</option>
-                    <option value="dance">Dance</option>
-                    <option value="skate">Roller Skating</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label for="goalDescription" class="form-label">Goal Description</label>
-                <textarea class="form-control" id="goalDescription" rows="3" required></textarea>
-            </div>
-            <div class="mb-3">
-                <label for="weeksToWork" class="form-label">Number of Weeks to Work on This Goal</label>
-                <input type="number" class="form-control" id="weeksToWork" min="1" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Add Goal</button>
-        </form>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Workout Type</th>
+                        <th>Description</th>
+                        <th>Weeks to Complete</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="goalsTableBody">
+                    <!-- Goals will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <div class="row mt-4">
+    <div class="col-md-12 text-center">
+        <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#addGoalForm" aria-expanded="false" aria-controls="addGoalForm" id="addGoalButton">
+            <i class="fas fa-plus"></i> Add New Goal
+        </button>
+    </div>
+</div>
+
+<div class="row mt-3">
     <div class="col-md-12">
-        <h3>Your Goals</h3>
-        <ul id="goalsList" class="list-group">
-            <!-- Goals will be populated by JavaScript -->
-        </ul>
+        <div class="collapse" id="addGoalForm">
+            <div class="card card-body">
+                <form id="goalsForm">
+                    <input type="hidden" id="goalId">
+                    <div class="mb-3">
+                        <label for="workoutType" class="form-label">Workout Type</label>
+                        <select class="form-select" id="workoutType" required>
+                            <option value="pilates">Pilates</option>
+                            <option value="dance">Dance</option>
+                            <option value="skate">Roller Skating</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="goalDescription" class="form-label">Goal Description</label>
+                        <textarea class="form-control" id="goalDescription" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="weeksToWork" class="form-label">Number of Weeks to Work on This Goal</label>
+                        <input type="number" class="form-control" id="weeksToWork" min="1" required>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-success" id="submitButton">Save Goal</button>
+                        <button type="button" class="btn btn-secondary" id="cancelButton" style="display: none;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -42,17 +69,107 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const goalsForm = document.getElementById('goalsForm');
-    const goalsList = document.getElementById('goalsList');
+    const goalsTableBody = document.getElementById('goalsTableBody');
+    const addGoalForm = document.getElementById('addGoalForm');
+    const addGoalButton = document.getElementById('addGoalButton');
+    const submitButton = document.getElementById('submitButton');
+    const cancelButton = document.getElementById('cancelButton');
+    const goalIdInput = document.getElementById('goalId');
+
+    // Function to reset form to "add" mode
+    function resetForm() {
+        goalIdInput.value = '';
+        goalsForm.reset();
+        submitButton.textContent = 'Save Goal';
+        cancelButton.style.display = 'none';
+        addGoalButton.innerHTML = '<i class="fas fa-plus"></i> Add New Goal';
+    }
+
+    // Function to set form to "edit" mode
+    function setEditMode(goal) {
+        goalIdInput.value = goal.id;
+        document.getElementById('workoutType').value = goal.workout_type;
+        document.getElementById('goalDescription').value = goal.description;
+        document.getElementById('weeksToWork').value = goal.weeks_to_complete;
+        submitButton.textContent = 'Update Goal';
+        cancelButton.style.display = 'block';
+        addGoalButton.innerHTML = '<i class="fas fa-edit"></i> Edit Mode';
+    }
+
+    // Function to create edit button
+    function createEditButton(goal) {
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm btn-outline-primary me-2';
+        button.innerHTML = '<i class="fas fa-edit"></i> Edit';
+        button.onclick = function() {
+            setEditMode(goal);
+            const bsCollapse = new bootstrap.Collapse(addGoalForm);
+            bsCollapse.show();
+        };
+        return button;
+    }
+
+    // Function to create delete button
+    function createDeleteButton(goal) {
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm btn-outline-danger';
+        button.innerHTML = '<i class="fas fa-trash"></i> Delete';
+        button.onclick = function() {
+            if (confirm('Are you sure you want to delete this goal?')) {
+                fetch(`/api/goals/${goal.id}`, {
+                    method: 'DELETE',
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error || 'Failed to delete goal'); });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const row = goalsTableBody.querySelector(`tr[data-goal-id="${goal.id}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        };
+        return button;
+    }
+
+    // Cancel button handler
+    cancelButton.addEventListener('click', function() {
+        resetForm();
+        const bsCollapse = new bootstrap.Collapse(addGoalForm);
+        bsCollapse.hide();
+    });
+
+    // Add Goal button handler
+    addGoalButton.addEventListener('click', function() {
+        if (!goalIdInput.value) {
+            resetForm();
+        }
+    });
 
     // Fetch goals from the server
     fetch('/api/goals')
         .then(response => response.json())
         .then(goals => {
             goals.forEach(goal => {
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item';
-                listItem.innerHTML = `<strong>${goal.workout_type}</strong>: ${goal.description} - Weeks: ${goal.weeks_to_complete}`;
-                goalsList.appendChild(listItem);
+                const row = document.createElement('tr');
+                row.setAttribute('data-goal-id', goal.id);
+                row.innerHTML = `
+                    <td>${goal.workout_type}</td>
+                    <td>${goal.description}</td>
+                    <td>${goal.weeks_to_complete}</td>
+                    <td></td>
+                `;
+                const actionsCell = row.querySelector('td:last-child');
+                actionsCell.appendChild(createEditButton(goal));
+                actionsCell.appendChild(createDeleteButton(goal));
+                goalsTableBody.appendChild(row);
             });
         })
         .catch(error => {
@@ -64,10 +181,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const workoutType = document.getElementById('workoutType').value;
         const goalDescription = document.getElementById('goalDescription').value;
         const weeksToWork = document.getElementById('weeksToWork').value;
+        const goalId = goalIdInput.value;
+
+        const method = goalId ? 'PUT' : 'POST';
+        const url = goalId ? `/api/goals/${goalId}` : '/api/goals';
 
         // Send data to backend
-        fetch('/api/goals', {
-            method: 'POST',
+        fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -79,18 +200,45 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.error || 'Failed to create goal'); });
+                return response.json().then(err => { throw new Error(err.error || 'Failed to save goal'); });
             }
             return response.json();
         })
         .then(data => {
-            // Add the goal to the list
             const goal = data.goal;
-            const listItem = document.createElement('li');
-            listItem.className = 'list-group-item';
-            listItem.innerHTML = `<strong>${goal.workout_type}</strong>: ${goal.description} - Weeks: ${goal.weeks_to_complete}`;
-            goalsList.appendChild(listItem);
-            goalsForm.reset();
+            if (goalId) {
+                // Update existing row
+                const row = goalsTableBody.querySelector(`tr[data-goal-id="${goalId}"]`);
+                if (row) {
+                    row.innerHTML = `
+                        <td>${goal.workout_type}</td>
+                        <td>${goal.description}</td>
+                        <td>${goal.weeks_to_complete}</td>
+                        <td></td>
+                    `;
+                    const actionsCell = row.querySelector('td:last-child');
+                    actionsCell.appendChild(createEditButton(goal));
+                    actionsCell.appendChild(createDeleteButton(goal));
+                }
+            } else {
+                // Add new row
+                const row = document.createElement('tr');
+                row.setAttribute('data-goal-id', goal.id);
+                row.innerHTML = `
+                    <td>${goal.workout_type}</td>
+                    <td>${goal.description}</td>
+                    <td>${goal.weeks_to_complete}</td>
+                    <td></td>
+                `;
+                const actionsCell = row.querySelector('td:last-child');
+                actionsCell.appendChild(createEditButton(goal));
+                actionsCell.appendChild(createDeleteButton(goal));
+                goalsTableBody.appendChild(row);
+            }
+            
+            resetForm();
+            const bsCollapse = new bootstrap.Collapse(addGoalForm);
+            bsCollapse.hide();
         })
         .catch(error => {
             console.error('Error:', error);
