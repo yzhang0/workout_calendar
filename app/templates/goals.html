@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Goals - Workout Calendar{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Set Your Workout Goals</h2>
+        <form id="goalsForm">
+            <div class="mb-3">
+                <label for="workoutType" class="form-label">Workout Type</label>
+                <select class="form-select" id="workoutType" required>
+                    <option value="pilates">Pilates</option>
+                    <option value="dance">Dance</option>
+                    <option value="skate">Roller Skating</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="goalDescription" class="form-label">Goal Description</label>
+                <textarea class="form-control" id="goalDescription" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="weeksToWork" class="form-label">Number of Weeks to Work on This Goal</label>
+                <input type="number" class="form-control" id="weeksToWork" min="1" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Goal</button>
+        </form>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h3>Your Goals</h3>
+        <ul id="goalsList" class="list-group">
+            <!-- Goals will be populated by JavaScript -->
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const goalsForm = document.getElementById('goalsForm');
+    const goalsList = document.getElementById('goalsList');
+
+    // Fetch goals from the server
+    fetch('/api/goals')
+        .then(response => response.json())
+        .then(goals => {
+            goals.forEach(goal => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item';
+                listItem.innerHTML = `<strong>${goal.workout_type}</strong>: ${goal.description} - Weeks: ${goal.weeks_to_complete}`;
+                goalsList.appendChild(listItem);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching goals:', error);
+        });
+
+    goalsForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const workoutType = document.getElementById('workoutType').value;
+        const goalDescription = document.getElementById('goalDescription').value;
+        const weeksToWork = document.getElementById('weeksToWork').value;
+
+        // Send data to backend
+        fetch('/api/goals', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                workoutType: workoutType,
+                goalDescription: goalDescription,
+                weeksToWork: weeksToWork
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error || 'Failed to create goal'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Add the goal to the list
+            const goal = data.goal;
+            const listItem = document.createElement('li');
+            listItem.className = 'list-group-item';
+            listItem.innerHTML = `<strong>${goal.workout_type}</strong>: ${goal.description} - Weeks: ${goal.weeks_to_complete}`;
+            goalsList.appendChild(listItem);
+            goalsForm.reset();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+});
+</script>
+{% endblock %} 

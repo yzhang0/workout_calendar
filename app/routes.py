@@ -2,13 +2,24 @@ from flask import Blueprint, render_template, flash, redirect, url_for, request,
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.urls import url_parse
 from app import db
-from app.models import User, Workout
+from app.models import User, Workout, Goal
 from datetime import datetime, timedelta
 from dateutil.rrule import rrulestr
 from sqlalchemy.exc import IntegrityError
 import traceback
+from functools import wraps
 
 bp = Blueprint('main', __name__)
+
+def api_wrapper(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+    return wrapped
 
 @bp.route('/')
 @bp.route('/index')
@@ -88,45 +99,69 @@ def logout():
 @login_required
 def get_workouts():
     workouts = Workout.query.filter_by(user_id=current_user.id).all()
-    return jsonify([{
-        'id': w.id,
-        'start': w.date.isoformat(),
-        'type': w.type,
-        'description': w.description,
-        'duration': w.duration,
-        'completed': w.completed,
-        'className': f"{w.type} {'completed' if w.completed else ''}"
-    } for w in workouts])
+    events = []
+    
+    for workout in workouts:
+        # Base event data
+        event_data = {
+            'id': workout.id,
+            'title': workout.title,
+            'type': workout.type,
+            'description': workout.description,
+            'duration': workout.duration,
+            'completed': workout.completed,
+            'className': f"{workout.type} {'completed' if workout.completed else ''}"
+        }
+        
+        if workout.is_recurring and workout.recurrence_rule:
+            # Add recurring class to className
+            event_data['className'] += ' recurring'
+            
+            # Parse the recurrence rule
+            rule = rrulestr(workout.recurrence_rule, dtstart=workout.date)
+            
+            # If there's an end date, use it
+            if workout.recurrence_end:
+                occurrences = rule.between(workout.date, workout.recurrence_end, inc=True)
+            else:
+                # If no end date, generate next few occurrences
+                occurrences = list(rule.xafter(workout.date, count=10, inc=True))
+            
+            # Create an event for each occurrence
+            for occurrence in occurrences:
+                occurrence_data = event_data.copy()
+                occurrence_data['start'] = occurrence.isoformat()
+                events.append(occurrence_data)
+        else:
+            # Single event
+            event_data['start'] = workout.date.isoformat()
+            events.append(event_data)
+    
+    return jsonify(events)
 
 @bp.route('/api/workouts', methods=['POST'])
 @login_required
+@api_wrapper
 def create_workout():
-    try:
-        data = request.json
-        print(data)
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-
-        workout = Workout(
-            type=data['type'],
-            date=datetime.fromisoformat(data['date']),
-            duration=data['duration'],
-            description=data.get('description', ''),
-            user_id=current_user.id,
-            is_recurring=data.get('is_recurring', False),
-            recurrence_rule=data.get('recurrence_rule'),
-            recurrence_end=datetime.fromisoformat(data['recurrence_end']) if data.get('recurrence_end') else None
-        )
-        db.session.add(workout)
-        db.session.commit()
-        return jsonify(workout.to_dict())
-    except Exception as e:
-        db.session.rollback()
-        traceback.print_exc()  # This will print the full stack trace to your server log
-        return jsonify({'error': str(e)}), 400
+    data = request.json
+    workout = Workout(
+        type=data['type'],
+        title=data['title'],
+        date=datetime.fromisoformat(data['date']),
+        duration=data['duration'],
+        description=data.get('description', ''),
+        user_id=current_user.id,
+        is_recurring=data.get('is_recurring', False),
+        recurrence_rule=data.get('recurrence_rule'),
+        recurrence_end=datetime.fromisoformat(data['recurrence_end']) if data.get('recurrence_end') else None
+    )
+    db.session.add(workout)
+    db.session.commit()
+    return jsonify(workout.to_dict())
 
 @bp.route('/api/workouts/<int:id>', methods=['DELETE'])
 @login_required
+@api_wrapper
 def delete_workout(id):
     workout = Workout.query.get_or_404(id)
     if workout.user_id != current_user.id:
@@ -137,6 +172,7 @@ def delete_workout(id):
 
 @bp.route('/api/workouts/<int:id>/toggle', methods=['POST'])
 @login_required
+@api_wrapper
 def toggle_workout(id):
     workout = Workout.query.get_or_404(id)
     if workout.user_id != current_user.id:
@@ -144,3 +180,48 @@ def toggle_workout(id):
     workout.completed = not workout.completed
     db.session.commit()
     return jsonify(workout.to_dict())
+
+@bp.route('/goals')
+@login_required
+@api_wrapper
+def goals():
+    return render_template('goals.html')
+
+@bp.route('/api/goals', methods=['POST'])
+@login_required
+@api_wrapper
+def create_goal():
+    data = request.get_json()
+    workout_type = data.get('workoutType')
+    description = data.get('goalDescription')
+    weeks_to_complete = data.get('weeksToWork')
+    print(workout_type, description, weeks_to_complete)
+    if not (workout_type and description and weeks_to_complete):
+        return jsonify({'error': 'Missing required fields'}), 400
+    goal = Goal(
+        workout_type=workout_type,
+        description=description,
+        weeks_to_complete=int(weeks_to_complete),
+        user_id=current_user.id
+    )
+    db.session.add(goal)
+    db.session.commit()
+    print(goal)
+    return jsonify({'message': 'Goal created', 'goal': {
+        'id': goal.id,
+        'workout_type': goal.workout_type,
+        'description': goal.description,
+        'weeks_to_complete': goal.weeks_to_complete
+    }})
+
+@bp.route('/api/goals', methods=['GET'])
+@login_required
+@api_wrapper
+def get_goals():
+    goals = Goal.query.filter_by(user_id=current_user.id).all()
+    return jsonify([{
+        'id': goal.id,
+        'workout_type': goal.workout_type,
+        'description': goal.description,
+        'weeks_to_complete': goal.weeks_to_complete
+    } for goal in goals])

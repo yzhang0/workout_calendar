@@ -51,4 +51,20 @@ class Workout(db.Model):
             'is_recurring': self.is_recurring,
             'recurrence_rule': self.recurrence_rule,
             'recurrence_end': self.recurrence_end.isoformat() if self.recurrence_end else None
-        } 
+        }
+
+class Goal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    workout_type = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    weeks_to_complete = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('goals', lazy=True))
+    subgoals = db.relationship('SubGoal', backref='goal', lazy=True, cascade='all, delete-orphan')
+
+class SubGoal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    link = db.Column(db.String(200))
+    description = db.Column(db.Text, nullable=False)
+    weeks_to_complete = db.Column(db.Integer, nullable=False)
+    goal_id = db.Column(db.Integer, db.ForeignKey('goal.id'), nullable=False) 
