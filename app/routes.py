@@ -8,6 +8,11 @@ from dateutil.rrule import rrulestr
 from sqlalchemy.exc import IntegrityError
 import traceback
 from functools import wraps
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('main', __name__)
 
@@ -146,13 +151,11 @@ def create_workout():
     data = request.json
     workout = Workout(
         type=data['type'],
+        title=data['title'],
         date=datetime.fromisoformat(data['date']),
         duration=data['duration'],
         description=data.get('description', ''),
-        user_id=current_user.id,
-        is_recurring=data.get('is_recurring', False),
-        recurrence_rule=data.get('recurrence_rule'),
-        recurrence_end=datetime.fromisoformat(data['recurrence_end']) if data.get('recurrence_end') else None
+        user_id=current_user.id
     )
     db.session.add(workout)
     db.session.commit()
@@ -191,16 +194,24 @@ def goals():
 @api_wrapper
 def create_goal():
     data = request.get_json()
+    logger.debug(f"Received data in create_goal: {data}")
+    
     workout_type = data.get('workoutType')
     description = data.get('goalDescription')
     weeks_to_complete = data.get('weeksToWork')
-    print(workout_type, description, weeks_to_complete)
+    title = data.get('title')
+    link = data.get('link')
+    
+    logger.debug(f"Parsed fields: title={title}, workout_type={workout_type}, description={description}, weeks={weeks_to_complete}, link={link}")
+    
     if not (workout_type and description and weeks_to_complete):
         return jsonify({'error': 'Missing required fields'}), 400
     goal = Goal(
         workout_type=workout_type,
         description=description,
         weeks_to_complete=int(weeks_to_complete),
+        title=title,
+        link=link,
         user_id=current_user.id
     )
     db.session.add(goal)
@@ -209,7 +220,9 @@ def create_goal():
         'id': goal.id,
         'workout_type': goal.workout_type,
         'description': goal.description,
-        'weeks_to_complete': goal.weeks_to_complete
+        'weeks_to_complete': goal.weeks_to_complete,
+        'title': goal.title,
+        'link': goal.link
     }})
 
 @bp.route('/api/goals', methods=['GET'])
@@ -221,21 +234,28 @@ def get_goals():
         'id': goal.id,
         'workout_type': goal.workout_type,
         'description': goal.description,
-        'weeks_to_complete': goal.weeks_to_complete
+        'weeks_to_complete': goal.weeks_to_complete,
+        'title': goal.title,
+        'link': goal.link
     } for goal in goals])
 
 @bp.route('/api/goals/<int:id>', methods=['PUT'])
 @login_required
 @api_wrapper
 def update_goal(id):
+    print("update goal")
+    logger.debug("update goal")
     goal = Goal.query.get_or_404(id)
     if goal.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
     
     data = request.get_json()
+    logger.debug("update data:",data)
     workout_type = data.get('workoutType')
     description = data.get('goalDescription')
     weeks_to_complete = data.get('weeksToWork')
+    title = data.get('title')
+    link = data.get('link')
     
     if not (workout_type and description and weeks_to_complete):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -243,6 +263,8 @@ def update_goal(id):
     goal.workout_type = workout_type
     goal.description = description
     goal.weeks_to_complete = int(weeks_to_complete)
+    goal.title = title
+    goal.link = link
     
     db.session.commit()
     
@@ -250,7 +272,9 @@ def update_goal(id):
         'id': goal.id,
         'workout_type': goal.workout_type,
         'description': goal.description,
-        'weeks_to_complete': goal.weeks_to_complete
+        'weeks_to_complete': goal.weeks_to_complete,
+        'title': goal.title,
+        'link': goal.link
     }})
 
 @bp.route('/api/goals/<int:id>', methods=['DELETE'])

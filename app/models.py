@@ -55,8 +55,10 @@ class Workout(db.Model):
 
 class Goal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
     workout_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=False)
+    link = db.Column(db.String(200))
     weeks_to_complete = db.Column(db.Integer, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('goals', lazy=True))

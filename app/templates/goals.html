@@ -3,6 +3,17 @@
 {% block title %}Goals - Workout Calendar{% endblock %}
 
 {% block content %}
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage"></div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-12">
         <h2>Set Your Workout Goals</h2>
@@ -10,8 +21,10 @@
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
+                        <th>Title</th>
                         <th>Workout Type</th>
                         <th>Description</th>
+                        <th>Link</th>
                         <th>Weeks to Complete</th>
                         <th>Actions</th>
                     </tr>
@@ -39,6 +52,10 @@
                 <form id="goalsForm">
                     <input type="hidden" id="goalId">
                     <div class="mb-3">
+                        <label for="goalTitle" class="form-label">Goal Title</label>
+                        <input type="text" class="form-control" id="goalTitle" required>
+                    </div>
+                    <div class="mb-3">
                         <label for="workoutType" class="form-label">Workout Type</label>
                         <select class="form-select" id="workoutType" required>
                             <option value="pilates">Pilates</option>
@@ -51,11 +68,18 @@
                         <textarea class="form-control" id="goalDescription" rows="3" required></textarea>
                     </div>
                     <div class="mb-3">
+                        <label for="goalLink" class="form-label">Link (Optional)</label>
+                        <input type="url" class="form-control" id="goalLink" placeholder="https://...">
+                    </div>
+                    <div class="mb-3">
                         <label for="weeksToWork" class="form-label">Number of Weeks to Work on This Goal</label>
                         <input type="number" class="form-control" id="weeksToWork" min="1" required>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <button type="submit" class="btn btn-success" id="submitButton">Save Goal</button>
+                        <button type="submit" class="btn btn-success" id="submitButton">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="submitSpinner"></span>
+                            <span id="submitText">Save Goal</span>
+                        </button>
                         <button type="button" class="btn btn-secondary" id="cancelButton" style="display: none;">Cancel</button>
                     </div>
                 </form>
@@ -73,14 +97,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const addGoalForm = document.getElementById('addGoalForm');
     const addGoalButton = document.getElementById('addGoalButton');
     const submitButton = document.getElementById('submitButton');
+    const submitSpinner = document.getElementById('submitSpinner');
+    const submitText = document.getElementById('submitText');
     const cancelButton = document.getElementById('cancelButton');
     const goalIdInput = document.getElementById('goalId');
+    const toast = new bootstrap.Toast(document.getElementById('toast'));
+
+    // Function to show toast notification
+    function showToast(title, message, type = 'success') {
+        const toastEl = document.getElementById('toast');
+        toastEl.className = `toast ${type === 'error' ? 'bg-danger text-white' : 'bg-success text-white'}`;
+        document.getElementById('toastTitle').textContent = title;
+        document.getElementById('toastMessage').textContent = message;
+        toast.show();
+    }
+
+    // Function to set loading state
+    function setLoading(isLoading) {
+        submitSpinner.classList.toggle('d-none', !isLoading);
+        submitText.textContent = isLoading ? 'Saving...' : (goalIdInput.value ? 'Update Goal' : 'Save Goal');
+        submitButton.disabled = isLoading;
+    }
 
     // Function to reset form to "add" mode
     function resetForm() {
         goalIdInput.value = '';
         goalsForm.reset();
-        submitButton.textContent = 'Save Goal';
+        submitText.textContent = 'Save Goal';
         cancelButton.style.display = 'none';
         addGoalButton.innerHTML = '<i class="fas fa-plus"></i> Add New Goal';
     }
@@ -88,10 +131,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to set form to "edit" mode
     function setEditMode(goal) {
         goalIdInput.value = goal.id;
+        document.getElementById('goalTitle').value = goal.title || '';
         document.getElementById('workoutType').value = goal.workout_type;
         document.getElementById('goalDescription').value = goal.description;
+        document.getElementById('goalLink').value = goal.link || '';
         document.getElementById('weeksToWork').value = goal.weeks_to_complete;
-        submitButton.textContent = 'Update Goal';
+        submitText.textContent = 'Update Goal';
         cancelButton.style.display = 'block';
         addGoalButton.innerHTML = '<i class="fas fa-edit"></i> Edit Mode';
     }
@@ -116,6 +161,9 @@ document.addEventListener('DOMContentLoaded', function() {
         button.innerHTML = '<i class="fas fa-trash"></i> Delete';
         button.onclick = function() {
             if (confirm('Are you sure you want to delete this goal?')) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                
                 fetch(`/api/goals/${goal.id}`, {
                     method: 'DELETE',
                 })
@@ -130,13 +178,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (row) {
                         row.remove();
                     }
+                    showToast('Success', 'Goal deleted successfully');
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    showToast('Error', error.message, 'error');
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-trash"></i> Delete';
                 });
             }
         };
         return button;
+    }
+
+    // Function to create link cell
+    function createLinkCell(link) {
+        const cell = document.createElement('td');
+        if (link) {
+            const a = document.createElement('a');
+            a.href = link;
+            a.target = '_blank';
+            a.innerHTML = '<i class="fas fa-external-link-alt"></i> Open';
+            cell.appendChild(a);
+        } else {
+            cell.textContent = '-';
+        }
+        return cell;
     }
 
     // Cancel button handler
@@ -161,11 +228,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('tr');
                 row.setAttribute('data-goal-id', goal.id);
                 row.innerHTML = `
+                    <td>${goal.title || '-'}</td>
                     <td>${goal.workout_type}</td>
                     <td>${goal.description}</td>
+                    <td></td>
                     <td>${goal.weeks_to_complete}</td>
                     <td></td>
                 `;
+                const linkCell = row.querySelector('td:nth-child(4)');
+                linkCell.replaceWith(createLinkCell(goal.link));
                 const actionsCell = row.querySelector('td:last-child');
                 actionsCell.appendChild(createEditButton(goal));
                 actionsCell.appendChild(createDeleteButton(goal));
@@ -174,14 +245,29 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error fetching goals:', error);
+            showToast('Error', 'Failed to load goals', 'error');
         });
 
     goalsForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        setLoading(true);
+
+        const goalTitle = document.getElementById('goalTitle').value;
         const workoutType = document.getElementById('workoutType').value;
         const goalDescription = document.getElementById('goalDescription').value;
+        const goalLink = document.getElementById('goalLink').value;
         const weeksToWork = document.getElementById('weeksToWork').value;
         const goalId = goalIdInput.value;
+
+        const requestData = {
+            title: goalTitle,
+            workoutType: workoutType,
+            goalDescription: goalDescription,
+            link: goalLink,
+            weeksToWork: weeksToWork
+        };
+
+        console.log('Sending data:', requestData);
 
         const method = goalId ? 'PUT' : 'POST';
         const url = goalId ? `/api/goals/${goalId}` : '/api/goals';
@@ -192,48 +278,56 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                workoutType: workoutType,
-                goalDescription: goalDescription,
-                weeksToWork: weeksToWork
-            })
+            body: JSON.stringify(requestData)
         })
         .then(response => {
+            console.log('Response status:', response.status);
             if (!response.ok) {
                 return response.json().then(err => { throw new Error(err.error || 'Failed to save goal'); });
             }
             return response.json();
         })
         .then(data => {
+            console.log('Received data:', data);
             const goal = data.goal;
             if (goalId) {
                 // Update existing row
                 const row = goalsTableBody.querySelector(`tr[data-goal-id="${goalId}"]`);
                 if (row) {
                     row.innerHTML = `
+                        <td>${goal.title || '-'}</td>
                         <td>${goal.workout_type}</td>
                         <td>${goal.description}</td>
+                        <td></td>
                         <td>${goal.weeks_to_complete}</td>
                         <td></td>
                     `;
+                    const linkCell = row.querySelector('td:nth-child(4)');
+                    linkCell.replaceWith(createLinkCell(goal.link));
                     const actionsCell = row.querySelector('td:last-child');
                     actionsCell.appendChild(createEditButton(goal));
                     actionsCell.appendChild(createDeleteButton(goal));
                 }
+                showToast('Success', 'Goal updated successfully');
             } else {
                 // Add new row
                 const row = document.createElement('tr');
                 row.setAttribute('data-goal-id', goal.id);
                 row.innerHTML = `
+                    <td>${goal.title || '-'}</td>
                     <td>${goal.workout_type}</td>
                     <td>${goal.description}</td>
+                    <td></td>
                     <td>${goal.weeks_to_complete}</td>
                     <td></td>
                 `;
+                const linkCell = row.querySelector('td:nth-child(4)');
+                linkCell.replaceWith(createLinkCell(goal.link));
                 const actionsCell = row.querySelector('td:last-child');
                 actionsCell.appendChild(createEditButton(goal));
                 actionsCell.appendChild(createDeleteButton(goal));
                 goalsTableBody.appendChild(row);
+                showToast('Success', 'Goal created successfully');
             }
             
             resetForm();
@@ -242,6 +336,10 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
+            showToast('Error', error.message, 'error');
+        })
+        .finally(() => {
+            setLoading(false);
         });
     });
 });
