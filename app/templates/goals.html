@@ -2,6 +2,18 @@
 
 {% block title %}Goals - Workout Calendar{% endblock %}
 
+{% block styles %}
+<style>
+    .description-cell {
+        white-space: pre-wrap;
+        max-width: 300px;
+    }
+    .description-cell a {
+        word-break: break-all;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Toast Container -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
@@ -191,6 +203,32 @@ document.addEventListener('DOMContentLoaded', function() {
         return button;
     }
 
+    // Function to create description cell
+    function createDescriptionCell(description) {
+        const cell = document.createElement('td');
+        cell.className = 'description-cell';
+        // First escape HTML to prevent XSS, then convert newlines to <br> tags
+        const escapedText = description
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        // Convert newlines to <br> tags after escaping HTML
+        const textWithBreaks = escapedText.replace(/\n/g, '<br>');
+        // Then convert URLs to links
+        cell.innerHTML = linkify(textWithBreaks);
+        return cell;
+    }
+
+    // Function to convert URLs in text to clickable links
+    function linkify(text) {
+        if (!text) return '';
+        // More precise URL regex with word boundaries and proper domain structure
+        const urlRegex = /\b(https?:\/\/[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?\/?[^\s<>]*)\b/g;
+        return text.replace(urlRegex, url => `<a href="${url}" target="_blank">${url}</a>`);
+    }
+
     // Function to create link cell
     function createLinkCell(link) {
         const cell = document.createElement('td');
@@ -230,11 +268,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.innerHTML = `
                     <td>${goal.title || '-'}</td>
                     <td>${goal.workout_type}</td>
-                    <td>${goal.description}</td>
+                    <td></td>
                     <td></td>
                     <td>${goal.weeks_to_complete}</td>
                     <td></td>
                 `;
+                const descriptionCell = row.querySelector('td:nth-child(3)');
+                descriptionCell.replaceWith(createDescriptionCell(goal.description));
                 const linkCell = row.querySelector('td:nth-child(4)');
                 linkCell.replaceWith(createLinkCell(goal.link));
                 const actionsCell = row.querySelector('td:last-child');
@@ -259,36 +299,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const weeksToWork = document.getElementById('weeksToWork').value;
         const goalId = goalIdInput.value;
 
-        const requestData = {
-            title: goalTitle,
-            workoutType: workoutType,
-            goalDescription: goalDescription,
-            link: goalLink,
-            weeksToWork: weeksToWork
-        };
-
-        console.log('Sending data:', requestData);
-
         const method = goalId ? 'PUT' : 'POST';
         const url = goalId ? `/api/goals/${goalId}` : '/api/goals';
 
-        // Send data to backend
         fetch(url, {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify({
+                title: goalTitle,
+                workoutType: workoutType,
+                goalDescription: goalDescription,
+                link: goalLink,
+                weeksToWork: weeksToWork
+            })
         })
         .then(response => {
-            console.log('Response status:', response.status);
             if (!response.ok) {
                 return response.json().then(err => { throw new Error(err.error || 'Failed to save goal'); });
             }
             return response.json();
         })
         .then(data => {
-            console.log('Received data:', data);
             const goal = data.goal;
             if (goalId) {
                 // Update existing row
@@ -297,11 +330,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     row.innerHTML = `
                         <td>${goal.title || '-'}</td>
                         <td>${goal.workout_type}</td>
-                        <td>${goal.description}</td>
+                        <td></td>
                         <td></td>
                         <td>${goal.weeks_to_complete}</td>
                         <td></td>
                     `;
+                    const descriptionCell = row.querySelector('td:nth-child(3)');
+                    descriptionCell.replaceWith(createDescriptionCell(goal.description));
                     const linkCell = row.querySelector('td:nth-child(4)');
                     linkCell.replaceWith(createLinkCell(goal.link));
                     const actionsCell = row.querySelector('td:last-child');
@@ -316,11 +351,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.innerHTML = `
                     <td>${goal.title || '-'}</td>
                     <td>${goal.workout_type}</td>
-                    <td>${goal.description}</td>
+                    <td></td>
                     <td></td>
                     <td>${goal.weeks_to_complete}</td>
                     <td></td>
                 `;
+                const descriptionCell = row.querySelector('td:nth-child(3)');
+                descriptionCell.replaceWith(createDescriptionCell(goal.description));
                 const linkCell = row.querySelector('td:nth-child(4)');
                 linkCell.replaceWith(createLinkCell(goal.link));
                 const actionsCell = row.querySelector('td:last-child');
